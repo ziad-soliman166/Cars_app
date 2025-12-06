@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/car.dart';
 import '../models/payment.dart';
 import '../providers/rental_provider.dart';
+import '../providers/auth_provider.dart';
 import 'rental_success_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -55,8 +56,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     try {
       final rentalProvider = Provider.of<RentalProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Get userId from auth provider
+      final userId = authProvider.user?.id ?? 'unknown_user';
       
       final payment = await rentalProvider.processRentalPayment(
+        userId: userId,
         car: widget.car,
         startDate: widget.startDate,
         endDate: widget.endDate,
