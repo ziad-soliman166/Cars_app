@@ -4,6 +4,7 @@ import '../models/rental.dart';
 import '../models/payment.dart';
 import '../services/car_service.dart';
 import '../services/payment_service.dart';
+import '../services/firestore_service.dart';
 
 class RentalProvider with ChangeNotifier {
   List<Car> _cars = [];
@@ -38,6 +39,7 @@ class RentalProvider with ChangeNotifier {
   }
 
   Future<Payment> processRentalPayment({
+    required String userId,
     required Car car,
     required DateTime startDate,
     required DateTime endDate,
@@ -55,8 +57,9 @@ class RentalProvider with ChangeNotifier {
       );
 
       if (payment.status == PaymentStatus.completed) {
+        final rentalId = 'rental_${DateTime.now().millisecondsSinceEpoch}';
         final rental = Rental(
-          id: 'rental_${DateTime.now().millisecondsSinceEpoch}',
+          id: rentalId,
           car: car,
           startDate: startDate,
           endDate: endDate,
@@ -67,6 +70,51 @@ class RentalProvider with ChangeNotifier {
 
         _rentals.add(rental);
         _currentRental = rental;
+
+        // Save rental data to Firestore
+        try {
+          await FirestoreService.addRentalToFirestore(
+            rentalId: rentalId,
+            userId: userId,
+            car: car,
+            startDate: startDate,
+            endDate: endDate,
+            totalPrice: totalPrice,
+            status: RentalStatus.confirmed,
+            paymentId: payment.id,
+          );
+        } catch (e) {
+          debugPrint('Error saving rental to Firestore: $e');
+        }
+
+        // Save payment data to Firestore
+        try {
+          await FirestoreService.addPaymentToFirestore(
+            paymentId: payment.id,
+            userId: userId,
+            rentalId: rentalId,
+            amount: totalPrice,
+            method: paymentDetails['method'] ?? 'card',
+            status: payment.status,
+            transactionId: payment.transactionId,
+          );
+        } catch (e) {
+          debugPrint('Error saving payment to Firestore: $e');
+        }
+
+        // Save payment method data to Firestore
+        try {
+          await FirestoreService.addPaymentMethodToFirestore(
+            userId: userId,
+            method: paymentDetails['method'] ?? 'card',
+            cardNumber: paymentDetails['cardNumber'],
+            cardHolder: paymentDetails['cardHolder'],
+            expiry: paymentDetails['expiry'],
+            cvv: paymentDetails['cvv'],
+          );
+        } catch (e) {
+          debugPrint('Error saving payment method to Firestore: $e');
+        }
 
         // Mark car as unavailable
         final carIndex = _cars.indexWhere((c) => c.id == car.id);

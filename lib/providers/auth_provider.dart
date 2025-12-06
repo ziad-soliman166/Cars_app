@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
+import '../services/firestore_service.dart';
 
 class AuthProvider with ChangeNotifier {
   User? _user;
@@ -21,11 +22,24 @@ class AuthProvider with ChangeNotifier {
 
     // Mock authentication - In a real app, this would call an API
     if (email.isNotEmpty && password.isNotEmpty) {
+      final userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
       _user = User(
-        id: 'user_${DateTime.now().millisecondsSinceEpoch}',
+        id: userId,
         email: email,
         name: email.split('@')[0],
       );
+      
+      // Save login activity to Firestore
+      try {
+        await FirestoreService.saveLoginActivity(
+          userId: userId,
+          email: email,
+        );
+      } catch (e) {
+        // Log error but don't fail login
+        debugPrint('Error saving login activity: $e');
+      }
+      
       _isLoading = false;
       _errorMessage = null;
       notifyListeners();
@@ -48,12 +62,29 @@ class AuthProvider with ChangeNotifier {
 
     // Mock authentication - In a real app, this would call an API
     if (email.isNotEmpty && password.isNotEmpty && name.isNotEmpty) {
+      final userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
       _user = User(
-        id: 'user_${DateTime.now().millisecondsSinceEpoch}',
+        id: userId,
         email: email,
         name: name,
         phoneNumber: phoneNumber,
       );
+      
+      // Save user data to Firestore
+      try {
+        await FirestoreService.addUserToFirestore(
+          userId: userId,
+          email: email,
+          name: name,
+          phoneNumber: phoneNumber,
+        );
+      } catch (e) {
+        _isLoading = false;
+        _errorMessage = 'Error saving user data: $e';
+        notifyListeners();
+        return false;
+      }
+      
       _isLoading = false;
       _errorMessage = null;
       notifyListeners();
